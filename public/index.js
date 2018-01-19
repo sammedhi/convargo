@@ -154,19 +154,60 @@ console.log(truckers);
 console.log(deliveries);
 console.log(actors);
 
-console.log(getShippingPrice());
-console.log(adaptPriceToM3(getShippingPrice()[0],26));
+console.log(computeAll());
 
-function getShippingPrice()
+function computeAll()
 {
-	var shipping_prices = [];
+	var payments = [];
 	for(var i = 0;i < deliveries.length;i++)
 	{
 		var delivery = deliveries[i];
-		var trucker = findTruckerByID(delivery.truckerId)
-		shipping_prices.push(delivery["distance"] * trucker["pricePerKm"] + delivery["volume"] * trucker["pricePerVolume"]);
+		var shipping_price = adaptPriceToM3(getShippingPrice(delivery) , delivery["volume"]);
+		delivery["price"] = shipping_price;
+		
+		var deductible_reduction = getDeductibleReduction(delivery);
+		var commission = computeCommission(delivery)
+		
+		var payment = {
+		"deliveryId": delivery["id"],
+		"payment": [
+			  {
+				"who": "shipper",
+				"type": "debit",
+				"amount": shipping_price + deductible_reduction
+			  },
+			  {
+				"who": "owner",
+				"type": "credit",
+				"amount": shipping_price - commission["total"]
+			  },
+			  {
+				"who": "insurance",
+				"type": "credit",
+				"amount": commission["insurance"]
+			  },
+			  {
+				"who": "treasury",
+				"type": "credit",
+				"amount": commission["treasury"]
+			  },
+			  {
+				"who": "convargo",
+				"type": "credit",
+				"amount": commission["convargo"] + deductible_reduction
+			  }
+			]
+		}
+		payments.push(payment);
 	}
-	return shipping_prices;
+	return payments
+}
+
+function getShippingPrice(delivery)
+{
+	var shipping_prices = 0;
+	var trucker = findTruckerByID(delivery.truckerId)
+	return delivery["distance"] * trucker["pricePerKm"] + delivery["volume"] * trucker["pricePerVolume"];
 }
 
 function findTruckerByID(id)
@@ -186,4 +227,31 @@ function adaptPriceToM3(price,m3)
 			return priceRateByM3[i][0] * price;
 	}
 	return price;
+}
+
+function computeCommission(delivery)
+{
+	var price = delivery["price"];
+	var distanceInKm = delivery["distance"];
+	
+	var commission = {
+		"total" : 0,
+		"insurance": 0,
+		"treasury": 0,
+		"convargo": 0};
+	
+	var total_commission = 0.3 * price;
+	commission["total"] = total_commission;
+	commission["insurance"] = 0.5 * total_commission;
+	commission["treasury"] = (Math.trunc(distanceInKm / 500.0) + 1) * 1;
+	commission["convargo"] = Math.max(0,total_commission - commission["insurance"] - commission["treasury"]);
+	
+	return commission
+}
+
+function getDeductibleReduction(delivery)
+{
+	if(!delivery["options"]["deductibleReduction"])
+		return 0.0;
+	return 1.0 * delivery["volume"];
 }
