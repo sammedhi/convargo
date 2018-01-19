@@ -145,6 +145,45 @@ const actors = [{
   }]
 }];
 
+const priceRateByM3 = 
+		[[0.5,25],
+		 [0.7,10],
+		 [0.9,5]];
+
 console.log(truckers);
 console.log(deliveries);
 console.log(actors);
+
+console.log(getShippingPrice());
+console.log(adaptPriceToM3(getShippingPrice()[0],26));
+
+function getShippingPrice()
+{
+	var shipping_prices = [];
+	for(var i = 0;i < deliveries.length;i++)
+	{
+		var delivery = deliveries[i];
+		var trucker = findTruckerByID(delivery.truckerId)
+		shipping_prices.push(delivery["distance"] * trucker["pricePerKm"] + delivery["volume"] * trucker["pricePerVolume"]);
+	}
+	return shipping_prices;
+}
+
+function findTruckerByID(id)
+{
+	for(var i = 0;i < truckers.length;i++)
+	{
+		if (truckers[i]["id"] == id)
+			return truckers[i]
+	}
+}
+		 
+function adaptPriceToM3(price,m3)
+{
+	for(var i = 0;i < priceRateByM3.length;i++)
+	{
+		if(priceRateByM3[i][1] < m3)
+			return priceRateByM3[i][0] * price;
+	}
+	return price;
+}
